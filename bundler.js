@@ -4,14 +4,23 @@ const babylon = require('babylon');
 const traverse = require('babel-traverse').default;
 const babel = require('babel-core');
 
+/** それぞれのAssetに付与される一意なID */
 let ID = 0;
 
+/**
+ * 与えられたファイルの依存関係を解析し、Assetを生成する
+ */
 function createAsset(filename) {
   const content = fs.readFileSync(filename, 'utf-8');
+
+
+  // JavaScriptのParserを使ってASTを構築する
+  // ref: https://astexplorer.net
   const ast = babylon.parse(content, { sourceType: 'module' });
 
   const dependencies = [];
 
+  // ASTを走査して、依存関係を抽出する
   traverse(ast, {
     ImportDeclaration: ({ node }) => {
       dependencies.push(node.source.value);
@@ -20,7 +29,9 @@ function createAsset(filename) {
 
   const id = ID++;
 
+  // Babelを用いてほとんどのブラウザが利用できるようなコードにトランスパイルする
   const { code } = babel.transformFromAst(ast, null, {
+    // どのようにトランスパイルするかを指定するルールセット
     presets: ['env'],
   });
 
@@ -32,6 +43,9 @@ function createAsset(filename) {
   }
 }
 
+/**
+ * Entry Pointから依存関係を解析し、Dependency graphを再帰的に生成する
+ */
 function createGraph(entry) {
   const mainAsset = createAsset(entry);
 
@@ -55,9 +69,15 @@ function createGraph(entry) {
   return queue;
 }
 
+/**
+ * AssetのGraphを受け取り、実行可能なコードを生成する
+ */
 function bundle(graph) {
   let modules = '';
 
+  // トランスパイル後のモジュールはCommonJSのModule Systemを利用する
+  // しかしブラウザではrequire, module, exportsといったオブジェクトは利用できないので、独自で定義する
+  // 2つめの値はそのモジュールの依存関係のマッピングを表す
   graph.forEach(mod => {
     modules += `${mod.id}: [
       function (require, module, exports) {
