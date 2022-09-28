@@ -12,6 +12,6 @@
     "babylon": "^6.18.0"
   },
   "scripts": {
-    "start": "node bundler.js | js-beautify"
+    "start": "node bundler.js"
   }
 }
